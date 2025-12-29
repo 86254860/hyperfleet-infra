@@ -1,10 +1,8 @@
-# HyperFleet GKE Developer Environment
-# Copy this file to dev-<username>.tfvars and customize
+# HyperFleet GKE Developer Shared Environment - Long-running Reserved Cluster
 #
 # Usage:
-#   cp dev.tfvars.example dev-<username>.tfvars
-#   terraform plan -var-file=envs/gke/dev-<username>.tfvars
-#   terraform apply -var-file=envs/gke/dev-<username>.tfvars
+#   terraform plan -var-file=envs/gke/dev-shared.tfvars
+#   terraform apply -var-file=envs/gke/dev-shared.tfvars
 
 # =============================================================================
 # Required: Your Info

@@ -7,7 +7,7 @@ locals {
   adapter_configs = {
     for adapter in var.adapters : adapter => {
       subscription_name        = "${var.namespace}-${adapter}-adapter-${var.developer_name}"
-      gcp_service_account_name = "${adapter}-adapter-${var.developer_name}"
+      gcp_service_account_name = substr("${adapter}-adapter-${var.developer_name}", 0, 30)
       k8s_service_account_name = "${adapter}-adapter"
     }
   }

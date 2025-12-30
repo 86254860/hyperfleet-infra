@@ -51,17 +51,16 @@ module "gke_cluster" {
 # =============================================================================
 module "pubsub" {
   source = "./modules/pubsub"
-  count  = var.enable_pubsub ? 1 : 0
+  count  = var.use_pubsub ? 1 : 0
 
-  project_id     = var.gcp_project_id
-  namespace      = var.namespace
-  resource_type  = "clusters"
-  developer_name = var.developer_name
+  project_id           = var.gcp_project_id
+  kubernetes_namespace = var.kubernetes_namespace
+  developer_name       = var.developer_name
 
-  # List of adapters - each gets its own subscription
-  adapters = var.adapters
+  # Topic configurations with adapter subscriptions
+  topic_configs = var.pubsub_topic_configs
 
-  # Kubernetes service account for Sentinel
+  # Kubernetes service account name for Sentinel (shared across all topics)
   sentinel_k8s_sa_name = "sentinel"
 
   # Dead letter queue

@@ -86,19 +86,19 @@ variable "aws_region" {
 # =============================================================================
 # Pub/Sub Configuration
 # =============================================================================
-variable "namespace" {
+variable "kubernetes_namespace" {
   description = "Kubernetes namespace for Workload Identity binding"
   type        = string
   default     = "hyperfleet-system"
 
   validation {
-    condition     = length(var.namespace) > 0
-    error_message = "namespace must not be empty."
+    condition     = length(var.kubernetes_namespace) > 0
+    error_message = "kubernetes_namespace must not be empty."
   }
 }
 
-variable "enable_pubsub" {
-  description = "Enable Google Pub/Sub for HyperFleet messaging"
+variable "use_pubsub" {
+  description = "Use Google Pub/Sub for HyperFleet messaging (instead of RabbitMQ)"
   type        = bool
   default     = false
 }
@@ -109,8 +109,37 @@ variable "enable_dead_letter" {
   default     = true
 }
 
-variable "adapters" {
-  description = "List of adapter names for Pub/Sub subscriptions (e.g., landing-zone, validation-gcp)"
-  type        = list(string)
-  default     = ["landing-zone", "validation-gcp"]
+variable "pubsub_topic_configs" {
+  description = <<-EOT
+    Pub/Sub topic configurations. Each topic can have its own set of adapter subscriptions.
+
+    Example:
+      pubsub_topic_configs = {
+        clusters = {
+          adapter_subscriptions = {
+            landing-zone   = {}
+            validation-gcp = { ack_deadline_seconds = 120 }
+          }
+        }
+        nodepools = {
+          adapter_subscriptions = {
+            validation-gcp = {}
+          }
+        }
+      }
+  EOT
+  type = map(object({
+    message_retention_duration = optional(string, "604800s")
+    adapter_subscriptions = map(object({
+      ack_deadline_seconds = optional(number, 60)
+    }))
+  }))
+  default = {
+    clusters = {
+      adapter_subscriptions = {
+        landing-zone   = {}
+        validation-gcp = {}
+      }
+    }
+  }
 }

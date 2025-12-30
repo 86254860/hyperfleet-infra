@@ -53,32 +53,7 @@ output "connect_command" {
 # Pub/Sub Outputs (when enabled)
 # =============================================================================
 
-output "sentinel_service_account_email" {
-  description = "Email of the Sentinel GCP service account"
-  value       = var.enable_pubsub ? module.pubsub[0].sentinel_service_account_email : ""
-}
-
-output "adapter_service_accounts" {
-  description = "Map of adapter names to their GCP service account emails"
-  value       = var.enable_pubsub ? module.pubsub[0].adapter_service_accounts : {}
-}
-
-output "topic_name" {
-  description = "Name of the Pub/Sub topic"
-  value       = var.enable_pubsub ? module.pubsub[0].topic_name : ""
-}
-
-output "subscription_names" {
-  description = "List of all adapter subscription names"
-  value       = var.enable_pubsub ? module.pubsub[0].subscription_names : []
-}
-
-output "dlq_topic_name" {
-  description = "Name of the dead letter topic (null when DLQ is disabled)"
-  value       = var.enable_pubsub ? module.pubsub[0].dlq_topic_name : null
-}
-
 output "helm_values_snippet" {
-  description = "Snippet to add to Helm values for Workload Identity annotations"
-  value       = var.enable_pubsub ? module.pubsub[0].helm_values_snippet : ""
+  description = "Snippet to add to Helm values for Workload Identity annotations and Pub/Sub configuration"
+  value       = var.use_pubsub ? module.pubsub[0].helm_values_snippet : ""
 }

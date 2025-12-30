@@ -37,10 +37,22 @@ use_spot_vms = true           # ~70% cost savings, may be preempted
 # =============================================================================
 # Pub/Sub Configuration (for HyperFleet messaging)
 # =============================================================================
-enable_pubsub      = false # Set to true to enable Google Pub/Sub for event messaging
-namespace          = "hyperfleet-system" # Kubernetes namespace for Workload Identity binding
-enable_dead_letter = true  # Enable dead letter queue for failed messages
+use_pubsub           = false # Set to true to use Google Pub/Sub for event messaging
+kubernetes_namespace = "hyperfleet-system" # Kubernetes namespace for Workload Identity binding
+enable_dead_letter   = true  # Enable dead letter queue for failed messages
 
-# Adapters - each adapter gets its own subscription
-# Add or remove adapters as needed for your development environment
-adapters = ["landing-zone", "validation-gcp"]
+# Topic configurations - each topic can have different adapter subscriptions
+# Uncomment and customize as needed for your development environment
+# pubsub_topic_configs = {
+#   clusters = {
+#     adapter_subscriptions = {
+#       landing-zone   = {}
+#       validation-gcp = {}
+#     }
+#   }
+#   nodepools = {
+#     adapter_subscriptions = {
+#       validation-gcp = {}
+#     }
+#   }
+# }

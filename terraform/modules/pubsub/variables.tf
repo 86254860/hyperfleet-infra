@@ -3,7 +3,7 @@ variable "project_id" {
   type        = string
 }
 
-variable "namespace" {
+variable "kubernetes_namespace" {
   description = "Kubernetes namespace for Workload Identity binding"
   type        = string
   default     = "hyperfleet-system"
@@ -14,38 +14,54 @@ variable "developer_name" {
   type        = string
 }
 
-variable "resource_type" {
-  description = "Resource type for topic naming (e.g., clusters, nodepools)"
-  type        = string
-  default     = "clusters"
-}
+variable "topic_configs" {
+  description = <<-EOT
+    Map of Pub/Sub topic configurations. Each topic can have its own set of adapter subscriptions.
 
-variable "topic_name" {
-  description = "Override topic name (default: {namespace}-{resource_type})"
-  type        = string
-  default     = ""
-}
+    Example:
+      topic_configs = {
+        clusters = {
+          message_retention_duration = "604800s"
+          adapter_subscriptions = {
+            landing-zone = {
+              ack_deadline_seconds = 60
+            }
+            validation-gcp = {}
+          }
+        }
+        nodepools = {
+          adapter_subscriptions = {
+            validation-gcp = {}
+          }
+        }
+      }
 
-variable "adapters" {
-  description = "List of adapter names. Each adapter gets subscription named: {namespace}-{adapter-name}-adapter"
-  type        = list(string)
-  default     = []
-}
+    This creates:
+    - Topic: hyperfleet-system-clusters-{developer}
+      - Subscription: hyperfleet-system-clusters-landing-zone-adapter-{developer}
+      - Subscription: hyperfleet-system-clusters-validation-gcp-adapter-{developer}
+    - Topic: hyperfleet-system-nodepools-{developer}
+      - Subscription: hyperfleet-system-nodepools-validation-gcp-adapter-{developer}
 
-variable "message_retention_duration" {
-  description = "How long to retain unacknowledged messages (default: 7 days)"
-  type        = string
-  default     = "604800s"
-}
-
-variable "ack_deadline_seconds" {
-  description = "ACK deadline for subscription (10-600 seconds)"
-  type        = number
-  default     = 60
+    Note: Subscription names include the topic name to ensure uniqueness across the GCP project.
+  EOT
+  type = map(object({
+    message_retention_duration = optional(string, "604800s")
+    adapter_subscriptions = map(object({
+      ack_deadline_seconds = optional(number, 60)
+    }))
+  }))
+  default = {}
 
   validation {
-    condition     = var.ack_deadline_seconds >= 10 && var.ack_deadline_seconds <= 600
-    error_message = "ack_deadline_seconds must be between 10 and 600."
+    condition = alltrue([
+      for topic_name, topic_config in var.topic_configs :
+      alltrue([
+        for adapter_name, adapter_config in topic_config.adapter_subscriptions :
+        adapter_config.ack_deadline_seconds >= 10 && adapter_config.ack_deadline_seconds <= 600
+      ])
+    ])
+    error_message = "ack_deadline_seconds must be between 10 and 600 for all adapter subscriptions."
   }
 }
 
@@ -67,7 +83,7 @@ variable "max_delivery_attempts" {
 }
 
 variable "sentinel_k8s_sa_name" {
-  description = "Sentinel Kubernetes service account name"
+  description = "Kubernetes service account name for Sentinel (shared across all topics)"
   type        = string
   default     = "sentinel"
 }

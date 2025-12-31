@@ -8,6 +8,7 @@
 # Personal tfvars files (keep the examples)
 **/dev-*.tfvars
 !**/dev.tfvars.example
+!**/dev-shared.tfvars
 
 # Crash logs
 crash.log

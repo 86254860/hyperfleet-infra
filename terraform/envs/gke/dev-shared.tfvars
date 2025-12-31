@@ -1,15 +1,13 @@
-# HyperFleet GKE Developer Environment
-# Copy this file to dev-<username>.tfvars and customize
+# HyperFleet GKE Developer Shared Environment - Long-running Reserved Cluster
 #
 # Usage:
-#   cp dev.tfvars.example dev-<username>.tfvars
-#   terraform plan -var-file=envs/gke/dev-<username>.tfvars
-#   terraform apply -var-file=envs/gke/dev-<username>.tfvars
+#   terraform plan -var-file=envs/gke/dev-shared.tfvars
+#   terraform apply -var-file=envs/gke/dev-shared.tfvars
 
 # =============================================================================
 # Required: Your Info
 # =============================================================================
-developer_name = "CHANGE_ME"  # Your username (e.g., "your-username")
+developer_name = "shared"  # Your username (e.g., "your-username")
 
 # =============================================================================
 # Cloud Provider
@@ -37,22 +35,21 @@ use_spot_vms = true           # ~70% cost savings, may be preempted
 # =============================================================================
 # Pub/Sub Configuration (for HyperFleet messaging)
 # =============================================================================
-use_pubsub           = false # Set to true to use Google Pub/Sub for event messaging
+use_pubsub           = true # Set to true to use Google Pub/Sub for event messaging
 kubernetes_namespace = "hyperfleet-system" # Kubernetes namespace for Workload Identity binding
 enable_dead_letter   = true  # Enable dead letter queue for failed messages
 
 # Topic configurations - each topic can have different adapter subscriptions
-# Uncomment and customize as needed for your development environment
-# pubsub_topic_configs = {
-#   clusters = {
-#     adapter_subscriptions = {
-#       landing-zone   = {}
-#       validation-gcp = {}
-#     }
-#   }
-#   nodepools = {
-#     adapter_subscriptions = {
-#       validation-gcp = {}
-#     }
-#   }
-# }
+pubsub_topic_configs = {
+  clusters = {
+    adapter_subscriptions = {
+      landing-zone   = {}
+      validation-gcp = {}
+    }
+  }
+  nodepools = {
+    adapter_subscriptions = {
+      validation-gcp = {}
+    }
+  }
+}

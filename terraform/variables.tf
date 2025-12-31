@@ -84,10 +84,10 @@ variable "aws_region" {
 }
 
 # =============================================================================
-# Kubernetes Configuration
+# Pub/Sub Configuration
 # =============================================================================
 variable "kubernetes_namespace" {
-  description = "Kubernetes namespace for HyperFleet components"
+  description = "Kubernetes namespace for Workload Identity binding"
   type        = string
   default     = "hyperfleet-system"
 
@@ -97,11 +97,8 @@ variable "kubernetes_namespace" {
   }
 }
 
-# =============================================================================
-# Pub/Sub Configuration
-# =============================================================================
-variable "enable_pubsub" {
-  description = "Enable Google Pub/Sub for HyperFleet messaging"
+variable "use_pubsub" {
+  description = "Use Google Pub/Sub for HyperFleet messaging (instead of RabbitMQ)"
   type        = bool
   default     = false
 }
@@ -110,4 +107,39 @@ variable "enable_dead_letter" {
   description = "Enable dead letter queue for Pub/Sub"
   type        = bool
   default     = true
+}
+
+variable "pubsub_topic_configs" {
+  description = <<-EOT
+    Pub/Sub topic configurations. Each topic can have its own set of adapter subscriptions.
+
+    Example:
+      pubsub_topic_configs = {
+        clusters = {
+          adapter_subscriptions = {
+            landing-zone   = {}
+            validation-gcp = { ack_deadline_seconds = 120 }
+          }
+        }
+        nodepools = {
+          adapter_subscriptions = {
+            validation-gcp = {}
+          }
+        }
+      }
+  EOT
+  type = map(object({
+    message_retention_duration = optional(string, "604800s")
+    adapter_subscriptions = map(object({
+      ack_deadline_seconds = optional(number, 60)
+    }))
+  }))
+  default = {
+    clusters = {
+      adapter_subscriptions = {
+        landing-zone   = {}
+        validation-gcp = {}
+      }
+    }
+  }
 }

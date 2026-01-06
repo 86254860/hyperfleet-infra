@@ -53,6 +53,21 @@ output "connect_command" {
 # Pub/Sub Outputs (when enabled)
 # =============================================================================
 
+output "pubsub_resources" {
+  description = "Complete Pub/Sub resources organized by topic"
+  value       = var.use_pubsub ? module.pubsub[0].pubsub_resources : {}
+}
+
+output "sentinel_service_account" {
+  description = "Sentinel GCP service account email"
+  value       = var.use_pubsub ? module.pubsub[0].sentinel_service_account : ""
+}
+
+output "adapter_service_accounts" {
+  description = "Map of adapter names to their GCP service account emails"
+  value       = var.use_pubsub ? module.pubsub[0].adapter_service_accounts : {}
+}
+
 output "helm_values_snippet" {
   description = "Snippet to add to Helm values for Workload Identity annotations and Pub/Sub configuration"
   value       = var.use_pubsub ? module.pubsub[0].helm_values_snippet : ""

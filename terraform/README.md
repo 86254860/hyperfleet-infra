@@ -22,11 +22,7 @@ Terraform configuration for creating personal HyperFleet development clusters.
 ```
 
 - **Shared VPC**: One VPC for all dev clusters (deployed once per project)
-- **Per-developer clusters**: Each developer gets their own isolated GKE cluster (shared across multiple deployments)
-- **Namespace scoping**: Pub/Sub resources are scoped to `{developer_name}-{kubernetes_suffix}` to allow multiple deployments per cluster
-  - Why? Because the principal used in Workload Identity permissions is `.../<identity pool>/ns/<namespace>/sa/<k8s_sa_name>`
-  - The `kubernetes_suffix` allows multiple terraform deployments to share a cluster but use different Pub/Sub resources
-  - Example: Developer "alice" can have both `alice-test1` and `alice-test2` namespaces in the same `hyperfleet-dev-alice` cluster
+- **Per-developer clusters**: Each developer gets their own isolated GKE cluster
 
 ## Prerequisites
 
@@ -67,7 +63,6 @@ cp envs/gke/dev.tfvars.example envs/gke/dev-<username>.tfvars
 
 # 4. Edit your tfvars - set developer_name to your username
 #    e.g., developer_name = "your-username"
-#    Optionally customize kubernetes_suffix (default: "default")
 
 # 5. Plan (review what will be created)
 terraform plan -var-file=envs/gke/dev-<username>.tfvars
@@ -110,7 +105,6 @@ terraform destroy -var-file=envs/gke/dev-<username>.tfvars
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `developer_name` | Your username (used in cluster name) | **required** |
-| `kubernetes_suffix` | Namespace suffix (allows multiple deployments per cluster) | `default` |
 | `cloud_provider` | Cloud provider (`gke`, `eks`, `aks`) | `gke` |
 | `gcp_project_id` | GCP project | `hcm-hyperfleet` |
 | `gcp_zone` | GCP zone | `us-central1-a` |
@@ -119,9 +113,10 @@ terraform destroy -var-file=envs/gke/dev-<username>.tfvars
 | `node_count` | Number of nodes | `1` |
 | `machine_type` | VM instance type | `e2-standard-4` |
 | `use_spot_vms` | Use Spot VMs for cost savings | `true` |
+| `kubernetes_namespace` | Kubernetes namespace for Workload Identity binding | `hyperfleet-system` |
 | `use_pubsub` | Use Google Pub/Sub for messaging (instead of RabbitMQ) | `false` |
 | `enable_dead_letter` | Enable dead letter queue for Pub/Sub | `true` |
-| `pubsub_topic_configs` | Map of Pub/Sub topic configurations with subscriptions and publishers | See below |
+| `pubsub_topic_configs` | Map of Pub/Sub topic configurations with adapter subscriptions | See below |
 
 ## Cost Optimization
 
@@ -139,26 +134,21 @@ Enable Pub/Sub to use Google's managed message broker instead of RabbitMQ.
 Add to your tfvars file:
 
 ```hcl
+kubernetes_namespace = "hyperfleet-system"  # Kubernetes namespace for Workload Identity binding
 use_pubsub = true
 enable_dead_letter = true  # Optional, defaults to true
 
-# Configure topics with their subscriptions and publishers
+# Configure topics and their adapter subscriptions
 pubsub_topic_configs = {
   clusters = {
-    subscriptions = {
+    adapter_subscriptions = {
       landing-zone   = {}
       validation-gcp = {}
     }
-    publishers = {
-      sentinel = {}
-    }
   }
   nodepools = {
-    subscriptions = {
-      validation-node-gcp = {}
-    }
-    publishers = {
-      sentinel = {}
+    adapter_subscriptions = {
+      validation-gcp = {}
     }
   }
 }
@@ -171,15 +161,15 @@ terraform apply -var-file=envs/gke/dev-<username>.tfvars \
   -var="use_pubsub=true"
 ```
 
-### Customizing Topics, Subscriptions, and Publishers
+### Customizing Topics and Subscriptions
 
-Each topic can have its own set of subscriptions (adapters) and publishers. Per-subscription and per-publisher settings can be configured:
+Each topic can have its own set of adapter subscriptions. Per-subscription settings can be configured:
 
 ```hcl
 pubsub_topic_configs = {
   clusters = {
     message_retention_duration = "604800s"  # 7 days (optional)
-    subscriptions = {
+    adapter_subscriptions = {
       landing-zone = {
         ack_deadline_seconds = 60  # Default: 60
       }
@@ -187,92 +177,72 @@ pubsub_topic_configs = {
         ack_deadline_seconds = 120  # Custom setting for this adapter
       }
     }
-    publishers = {
-      sentinel = {}  # Uses default roles: publisher and viewer
-    }
   }
   nodepools = {
-    subscriptions = {
-      validation-node-gcp = {}  # Only validation-node-gcp subscribes to nodepools
-    }
-    publishers = {
-      sentinel = {}
-      custom-publisher = {
-        roles = ["roles/pubsub.publisher"]  # Custom roles (optional)
-      }
+    adapter_subscriptions = {
+      validation-gcp = {}  # Only validation-gcp subscribes to nodepools
     }
   }
   volumes = {
-    subscriptions = {
+    adapter_subscriptions = {
       landing-zone = {}
       orchestrator = {}
-    }
-    publishers = {
-      sentinel = {}
     }
   }
 }
 ```
 
-When you add or remove topics/subscriptions/publishers and re-run `terraform apply`, the infrastructure will be updated accordingly.
+When you add or remove topics/subscriptions and re-run `terraform apply`, the infrastructure will be updated accordingly.
 
 ### What It Creates
 
 | Resource | Name Pattern | Description |
 |----------|--------------|-------------|
-| Pub/Sub Topics | `{developer_name}-{kubernetes_suffix}-{topic_name}` | Event topics (clusters, nodepools, etc.) |
-| Pub/Sub Subscriptions | `{developer_name}-{kubernetes_suffix}-{topic_name}-{adapter}-adapter` | Subscriptions per topic per adapter |
-| Dead Letter Topics | `{developer_name}-{kubernetes_suffix}-{topic_name}-dlq` | Failed message storage (optional) |
-| Workload Identity Bindings | - | Direct WIF permissions for K8s service accounts |
+| Pub/Sub Topics | `{kubernetes_namespace}-{topic_name}-{developer}` | Event topics (clusters, nodepools, etc.) |
+| Pub/Sub Subscriptions | `{kubernetes_namespace}-{topic_name}-{adapter}-adapter-{developer}` | Subscriptions per topic per adapter |
+| Dead Letter Topics | `{kubernetes_namespace}-{topic_name}-{developer}-dlq` | Failed message storage (optional) |
+| Service Accounts | `sentinel-{developer}` | Single publisher SA for all topics (one sentinel publishes to all topics) |
+| Service Accounts | `{adapter}-{developer}` | Subscriber SA per unique adapter |
+| Workload Identity | - | Binds K8s SAs to GCP SAs |
 
-**Example with developer `alice`, kubernetes_suffix `test1`, and config:**
+**Example with developer `alice` and config:**
 ```hcl
 pubsub_topic_configs = {
-  clusters = {
-    subscriptions = { landing-zone = {}, validation-gcp = {} }
-    publishers    = { sentinel = {} }
-  }
-  nodepools = {
-    subscriptions = { validation-node-gcp = {} }
-    publishers    = { sentinel = {} }
-  }
+  clusters  = { adapter_subscriptions = { landing-zone = {}, validation-gcp = {} } }
+  nodepools = { adapter_subscriptions = { validation-gcp = {} } }
 }
 ```
 
 **Creates:**
 - **Topics:**
-  - `alice-test1-clusters`
-  - `alice-test1-nodepools`
+  - `hyperfleet-system-clusters-alice`
+  - `hyperfleet-system-nodepools-alice`
 - **Subscriptions:**
-  - `alice-test1-clusters-landing-zone-adapter`
-  - `alice-test1-clusters-validation-gcp-adapter`
-  - `alice-test1-nodepools-validation-node-gcp-adapter`
-- **Workload Identity Bindings:**
-  - K8s SA `sentinel` in namespace `alice-test1` → publishes to clusters and nodepools topics
-  - K8s SA `landing-zone-adapter` in namespace `alice-test1` → subscribes to clusters topic
-  - K8s SA `validation-gcp-adapter` in namespace `alice-test1` → subscribes to clusters topic
-  - K8s SA `validation-node-gcp-adapter` in namespace `alice-test1` → subscribes to nodepools topic
+  - `hyperfleet-system-clusters-landing-zone-adapter-alice`
+  - `hyperfleet-system-clusters-validation-gcp-adapter-alice`
+  - `hyperfleet-system-nodepools-validation-gcp-adapter-alice`
+- **Service Accounts:**
+  - `sentinel-alice` (publishes to all topics: clusters, nodepools)
+  - `landing-zone-alice` (subscribes to clusters only)
+  - `validation-gcp-alice` (subscribes to both topics)
 
-Each deployment gets completely isolated Pub/Sub resources - multiple deployments can share a cluster by using different kubernetes_suffix values.
+Each developer gets completely isolated Pub/Sub resources - no conflicts between developer environments.
 
 ### IAM Permissions
 
-The module configures resource-level IAM permissions using Workload Identity Federation, following the principle of least privilege:
+The module configures resource-level IAM permissions following the principle of least privilege:
 
-**Publisher Kubernetes Service Accounts** (configured per topic):
-- Configurable roles per topic (default: `roles/pubsub.publisher` and `roles/pubsub.viewer`)
-- `roles/pubsub.publisher` - Publish messages to the topic
-- `roles/pubsub.viewer` - View topic metadata (required to check if topic exists)
-- Authenticated via WIF principal directly (no GCP service account created)
-- Example: `sentinel` service account gets publisher permissions on topics where it's configured
+**Sentinel Service Account** (`sentinel-{developer}`):
+- `roles/pubsub.publisher` on **all topics** - Publish messages to any topic
+- `roles/pubsub.viewer` on **all topics** - View topic metadata (required to check if topic exists)
+- `roles/iam.workloadIdentityUser` on **service account** - Allow K8s SA `sentinel` to impersonate this GCP SA
 
-**Adapter Kubernetes Service Accounts** (`{adapter}-adapter`):
-- `roles/pubsub.subscriber` on **their subscriptions** - Pull and acknowledge messages from subscriptions
+**Adapter Service Accounts** (`{adapter}-{developer}`):
+- `roles/pubsub.subscriber` on **their subscriptions** - Pull and acknowledge messages from subscriptions across all topics
 - `roles/pubsub.viewer` on **their subscriptions** - View subscription metadata
-- Authenticated via WIF principal directly (no GCP service account created)
-- Each adapter only has access to its specific subscriptions
+- `roles/iam.workloadIdentityUser` on **service account** - Allow K8s SA `{adapter}-adapter` to impersonate this GCP SA
 
-**Note**: This implementation uses Workload Identity Federation (WIF) principals directly, eliminating the need to create GCP service accounts. Kubernetes service accounts are granted permissions directly on Pub/Sub resources through WIF. Each Kubernetes service account can only access the specific resources they've been granted permissions for - publishers can only publish to their configured topics, and adapters cannot access topics directly or other adapters' subscriptions.
+**Note**: These are resource-level IAM bindings, not project-level roles. There is one shared sentinel GCP service account with publish access to all topics. Each adapter has one GCP service account that can access their subscriptions across all topics, but adapters cannot access topics directly or other adapters' subscriptions.
 
 ### Outputs
 
@@ -281,6 +251,10 @@ After applying with `use_pubsub=true`, you'll get these outputs:
 ```bash
 # Get complete Pub/Sub resources (hierarchical view)
 terraform output pubsub_resources
+
+# Get service account emails for Helm values
+terraform output sentinel_service_account   # Sentinel email (shared across all topics)
+terraform output adapter_service_accounts
 
 # Get ready-to-use Helm values snippet
 terraform output helm_values_snippet
@@ -294,56 +268,88 @@ Get the complete Helm values snippet (includes broker config and Workload Identi
 terraform output helm_values_snippet
 ```
 
-The output includes configurations organized by topic, showing the Helm chart configurations for publishers and adapters (subscribers) grouped by the topic they interact with.
+The output is formatted for the **hyperfleet-gcp** overlay chart structure:
+- Base chart components (sentinel, landing-zone) are nested under the `base:` prefix
+- GCP overlay components (validation-gcp) are at the root level
 
 **Example output structure:**
 ```yaml
-# ============================================================================
-# Services for Clusters Topic
-# ============================================================================
-# Publishers (publish to clusters topic)
-clusters-sentinel:
+# =============================================================================
+# HyperFleet Helm Values for GCP with Pub/Sub
+# Generated by terraform - use with charts/hyperfleet-gcp
+#
+# Usage:
+#   helm install hyperfleet charts/hyperfleet-gcp -f <this-file> -n hyperfleet-system
+# =============================================================================
+
+# Base chart overrides (API, Sentinel, Landing Zone)
+base:
+  global:
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        enabled: true
+        projectId: "hcm-hyperfleet"
+        createTopicIfMissing: false
+        createSubscriptionIfMissing: false
+      rabbitmq:
+        enabled: false
+
+  # Sentinel - publishes to hyperfleet-system-clusters-alice
+  sentinel:
+    serviceAccount:
+      create: true
+      name: sentinel
+      annotations:
+        iam.gke.io/gcp-service-account: sentinel-alice@hcm-hyperfleet.iam.gserviceaccount.com
+    broker:
+      type: googlepubsub
+      topic: hyperfleet-system-clusters-alice
+      googlepubsub:
+        projectId: hcm-hyperfleet
+
+  # Landing Zone Adapter - subscribes to hyperfleet-system-clusters-alice
+  landing-zone:
+    serviceAccount:
+      create: true
+      name: landing-zone-adapter
+      annotations:
+        iam.gke.io/gcp-service-account: landing-zone-alice@hcm-hyperfleet.iam.gserviceaccount.com
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        projectId: hcm-hyperfleet
+        topic: hyperfleet-system-clusters-alice
+        subscription: hyperfleet-system-clusters-landing-zone-adapter-alice
+        deadLetterTopic: hyperfleet-system-clusters-alice-dlq
+
+  # Disable RabbitMQ when using Pub/Sub
+  rabbitmq:
+    enabled: false
+
+# GCP Validation Adapter (GCP overlay chart component - NOT under base:)
+# Subscribes to hyperfleet-system-clusters-alice
+validation-gcp:
+  enabled: true
   serviceAccount:
-    name: "sentinel"  # K8s SA name for this publisher
+    create: true
+    name: validation-gcp-adapter
+    annotations:
+      iam.gke.io/gcp-service-account: validation-gcp-alice@hcm-hyperfleet.iam.gserviceaccount.com
   broker:
     type: googlepubsub
-    topic: alice-test1-clusters
     googlepubsub:
       projectId: hcm-hyperfleet
-
-# Adapters (subscribe to clusters topic)
-clusters-landing-zone-adapter:
-  serviceAccount:
-    name: landing-zone-adapter
-  broker:
-    type: googlepubsub
-    googlepubsub:
-      projectId: hcm-hyperfleet
-      topic: alice-test1-clusters
-      subscription: alice-test1-clusters-landing-zone-adapter
-
-clusters-validation-gcp-adapter:
-  # Similar configuration for validation-gcp adapter...
-
-# ============================================================================
-# Services for Nodepools Topic
-# ============================================================================
-# Sentinel (publishes to nodepools topic)
-nodepools-sentinel:
-  serviceAccount:
-    name: "sentinel"  # Same K8s SA as clusters-sentinel
-  broker:
-    type: googlepubsub
-    topic: alice-test1-nodepools
-    googlepubsub:
-      projectId: hcm-hyperfleet
-
-# Adapters (subscribe to nodepools topic)
-nodepools-validation-gcp-adapter:
-  # Configuration for validation-gcp adapter on nodepools topic...
+      topic: hyperfleet-system-clusters-alice
+      subscription: hyperfleet-system-clusters-validation-gcp-adapter-alice
+      deadLetterTopic: hyperfleet-system-clusters-alice-dlq
 ```
 
-**Note**: While each topic has a separate Helm configuration section (e.g., `clusters-sentinel`, `nodepools-sentinel`), they all use the **same** Kubernetes service account (`sentinel`). This single Kubernetes service account has permission to publish to all topics via Workload Identity Federation. No GCP service accounts are created - permissions are granted directly to Kubernetes service accounts. Adapter service configurations are grouped by the topic they subscribe to for clarity.
+**Chart Structure Note**: The hyperfleet-gcp chart uses a base + overlay pattern:
+- `base:` - Core platform components (API, Sentinel, Landing Zone, RabbitMQ)
+- Root level - GCP-specific components (validation-gcp)
+
+See the [hyperfleet-chart README](https://github.com/openshift-hyperfleet/hyperfleet-chart) for full documentation.
 
 ## Directory Structure
 

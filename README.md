@@ -86,8 +86,9 @@ hyperfleet-infra/
 
 - [hyperfleet-api](https://github.com/openshift-hyperfleet/hyperfleet-api) - HyperFleet API server
 - [hyperfleet-sentinel](https://github.com/openshift-hyperfleet/hyperfleet-sentinel) - HyperFleet Sentinel
-- [hyperfleet-adapter](https://github.com/openshift-hyperfleet/hyperfleet-adapter) - HyperFleet Adapter
-- [hyperfleet-chart](https://github.com/openshift-hyperfleet/hyperfleet-chart) - Helm chart for deployment
+- [adapter-landing-zone](https://github.com/openshift-hyperfleet/adapter-landing-zone) - Landing Zone adapter
+- [adapter-validation-gcp](https://github.com/openshift-hyperfleet/adapter-validation-gcp) - GCP Validation adapter
+- [hyperfleet-chart](https://github.com/openshift-hyperfleet/hyperfleet-chart) - Helm charts (base + cloud overlays)
 
 ## License
 

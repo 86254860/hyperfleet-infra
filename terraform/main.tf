@@ -67,3 +67,27 @@ module "pubsub" {
 
   labels = local.common_labels
 }
+
+# =============================================================================
+# External API Access (optional firewall rule for LoadBalancer health checks)
+# =============================================================================
+resource "google_compute_firewall" "allow_lb_health_checks" {
+  count   = var.enable_external_api && var.cloud_provider == "gke" ? 1 : 0
+  name    = "${local.cluster_name}-allow-lb-health-checks"
+  network = var.gcp_network
+  project = var.gcp_project_id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["8000"] # HyperFleet API port
+  }
+
+  # GCP Load Balancer health check source ranges
+  # https://cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges
+  source_ranges = ["35.191.0.0/16", "130.211.0.0/22"]
+
+  # Target GKE nodes
+  target_tags = ["gke-${local.cluster_name}"]
+
+  description = "Allow GCP health checks for LoadBalancer services exposing HyperFleet API"
+}

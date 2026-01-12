@@ -67,3 +67,17 @@ output "helm_values_snippet" {
   description = "Snippet to add to Helm values for Workload Identity and Pub/Sub configuration"
   value       = var.use_pubsub ? module.pubsub[0].helm_values_snippet : null
 }
+
+# =============================================================================
+# External API Access
+# =============================================================================
+
+output "external_api_enabled" {
+  description = "Whether external API access is enabled (LoadBalancer firewall rules)"
+  value       = var.enable_external_api
+}
+
+output "external_api_note" {
+  description = "Instructions for external API access"
+  value       = var.enable_external_api ? "External API access is ENABLED. Deploy with: helm install hyperfleet charts/hyperfleet-gcp --set base.hyperfleet-api.service.type=LoadBalancer -n hyperfleet-system" : "External API access is DISABLED. Set enable_external_api=true to enable."
+}

@@ -9,11 +9,6 @@ variable "kubernetes_namespace" {
   default     = "hyperfleet-system"
 }
 
-variable "developer_name" {
-  description = "Developer name to include in resource names for uniqueness"
-  type        = string
-}
-
 variable "topic_configs" {
   description = <<-EOT
     Map of Pub/Sub topic configurations. Each topic can have its own set of subscriptions and publishers.

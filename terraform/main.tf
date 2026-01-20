@@ -56,7 +56,6 @@ module "pubsub" {
 
   project_id           = var.gcp_project_id
   kubernetes_namespace = local.kubernetes_namespace
-  developer_name       = var.developer_name
 
   # Topic configurations with subscriptions and publishers
   topic_configs = var.pubsub_topic_configs

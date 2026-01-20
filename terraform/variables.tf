@@ -92,16 +92,6 @@ variable "aws_region" {
 # =============================================================================
 # Pub/Sub Configuration
 # =============================================================================
-variable "kubernetes_namespace" {
-  description = "Kubernetes namespace for Workload Identity binding"
-  type        = string
-  default     = "hyperfleet-system"
-
-  validation {
-    condition     = length(var.kubernetes_namespace) > 0
-    error_message = "kubernetes_namespace must not be empty."
-  }
-}
 
 variable "use_pubsub" {
   description = "Use Google Pub/Sub for HyperFleet messaging (instead of RabbitMQ)"

@@ -78,46 +78,63 @@ echo
 # Grant object-level permissions to project owners and editors
 # Required because uniform bucket-level access disables legacy ACLs
 # and legacyBucketOwner/legacyBucketReader don't include object permissions
-log "Granting storage.objectAdmin to project owners and editors"
+log "Granting IAM permissions to project owners, editors, and viewers"
 
-# Get current IAM policy
-gsutil iam get "gs://$BUCKET_NAME" > /tmp/bucket-iam-policy.json
+# Note: gsutil iam ch doesn't support project convenience groups (projectOwner, etc.)
+# with legacy roles, so we must use gsutil iam set. To avoid overwriting existing
+# bindings, we fetch the current policy, merge our bindings, then set it back.
 
-# Create new IAM policy with object-level permissions for project groups
-cat > /tmp/bucket-iam-policy.json <<EOF
-{
-  "bindings": [
-    {
-      "role": "roles/storage.legacyBucketOwner",
-      "members": [
-        "projectOwner:$PROJECT_ID"
-      ]
-    },
-    {
-      "role": "roles/storage.legacyBucketReader",
-      "members": [
-        "projectViewer:$PROJECT_ID"
-      ]
-    },
-    {
-      "role": "roles/storage.objectAdmin",
-      "members": [
-        "projectOwner:$PROJECT_ID",
-        "projectEditor:$PROJECT_ID"
-      ]
-    }
-  ]
-}
-EOF
+# Fetch current IAM policy
+CURRENT_POLICY=$(gsutil iam get "gs://$BUCKET_NAME")
 
-# Set the IAM policy
-gsutil iam set /tmp/bucket-iam-policy.json "gs://$BUCKET_NAME"
-rm /tmp/bucket-iam-policy.json
+# Required bindings for Terraform state management
+REQUIRED_BINDINGS='[
+  {
+    "role": "roles/storage.legacyBucketOwner",
+    "members": ["projectOwner:'$PROJECT_ID'"]
+  },
+  {
+    "role": "roles/storage.legacyBucketReader",
+    "members": ["projectViewer:'$PROJECT_ID'"]
+  },
+  {
+    "role": "roles/storage.objectAdmin",
+    "members": ["projectOwner:'$PROJECT_ID'", "projectEditor:'$PROJECT_ID'"]
+  }
+]'
+
+# Merge current policy with required bindings using jq
+# This preserves existing bindings and adds/updates only what we need
+MERGED_POLICY=$(echo "$CURRENT_POLICY" | jq --argjson required "$REQUIRED_BINDINGS" '
+  # Create a map of existing bindings by role
+  .bindings as $existing |
+
+  # Process each required binding
+  reduce $required[] as $req (
+    {bindings: $existing};
+
+    # Find if this role already exists
+    (.bindings | map(.role == $req.role) | index(true)) as $idx |
+
+    if $idx then
+      # Role exists - merge members (union to avoid duplicates)
+      .bindings[$idx].members |= (. + $req.members | unique)
+    else
+      # Role does not exist - add it
+      .bindings += [$req]
+    end
+  )
+')
+
+# Apply the merged policy
+echo "$MERGED_POLICY" | gsutil iam set /dev/stdin "gs://$BUCKET_NAME"
+
 success "IAM permissions granted to project owners and editors"
 echo
 
-# Set lifecycle policy to clean up old versions after 90 days
-log "Setting lifecycle policy (delete non-current versions after 90 days)"
+# Set lifecycle policy to clean up old versions
+# Keeps the 5 most recent versions AND deletes versions older than 90 days
+log "Setting lifecycle policy (keep 5 recent versions, delete versions >90 days old)"
 cat > /tmp/lifecycle.json <<EOF
 {
   "lifecycle": {
@@ -127,7 +144,8 @@ cat > /tmp/lifecycle.json <<EOF
           "type": "Delete"
         },
         "condition": {
-          "numNewerVersions": 3,
+          "numNewerVersions": 5,
+          "daysSinceNoncurrentTime": 90,
           "isLive": false
         }
       }
@@ -149,7 +167,9 @@ echo
 success "Backend setup complete!"
 echo
 echo "Next steps:"
-echo "  1. Grant team members IAM permissions (see terraform/BACKEND.md)"
+echo "  1. Grant individual team members IAM permissions for GCP resources"
+echo "     (see terraform/README.md#team-member-setup)"
+echo "     Note: Project owners/editors already have bucket access"
 echo "  2. Initialize Terraform with the backend:"
 echo "     cd terraform"
 echo "     terraform init -backend-config=\"prefix=terraform/state/dev-<your-name>\""

@@ -1,9 +1,8 @@
 # GCS backend for shared infrastructure state (VPC, networking)
-# Usage: terraform init -backend-config=shared.tfbackend
+# Usage (required): terraform init -backend-config=shared.tfbackend
 
 terraform {
   backend "gcs" {
-    bucket = "hyperfleet-terraform-state"
-    # prefix is set via shared.tfbackend
+    # bucket and prefix are set via -backend-config during init
   }
 }

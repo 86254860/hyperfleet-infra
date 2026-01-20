@@ -23,6 +23,7 @@ This Terraform configuration creates the shared networking infrastructure that a
 - `gcloud` CLI authenticated
 - Admin access to `hcm-hyperfleet` GCP project
 - **Remote backend bucket created** (run `../bootstrap/setup-backend.sh` first)
+  - Configures versioning and lifecycle policy (keeps 5 recent versions, deletes versions >90 days old)
 
 ## Usage
 

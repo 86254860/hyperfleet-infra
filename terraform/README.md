@@ -68,8 +68,10 @@ cp envs/gke/dev.tfbackend.example envs/gke/dev-<username>.tfbackend
 #    e.g., developer_name = "your-username"
 #    Optionally customize kubernetes_suffix (default: "default")
 
-# 4. Edit your tfbackend - set prefix to match your username
-#    e.g., prefix = "terraform/state/dev-<username>"
+# 4. Edit your tfbackend (if needed)
+#    - bucket is pre-configured: "hyperfleet-terraform-state"
+#    - prefix should match your username: "terraform/state/dev-<username>"
+#    Note: Use the same bucket with different prefixes for different environments (recommended)
 
 # 5. Initialize Terraform with remote backend
 terraform init -backend-config=envs/gke/dev-<username>.tfbackend
@@ -109,6 +111,16 @@ Personal tfvars override shared values, so you can customize specific settings w
 
 State files are stored in a **GCS bucket** (`hyperfleet-terraform-state`) with automatic locking for team collaboration.
 
+### Backend Configuration Approach
+
+Each `.tfbackend` file contains:
+- `bucket` - The GCS bucket name (currently `hyperfleet-terraform-state`)
+- `prefix` - The state file path within the bucket (unique per environment)
+
+**Recommendation:** Use the same bucket with different prefixes for different environments. This simplifies management while maintaining isolation.
+
+**To use a different bucket:** Run `bootstrap/setup-backend.sh` first to create the new bucket, then update the `bucket` value in your `.tfbackend` file.
+
 ### One-Time Setup (Admin Only)
 
 Create the backend bucket once:
@@ -118,14 +130,22 @@ cd terraform
 ./bootstrap/setup-backend.sh
 ```
 
+This script configures the GCS bucket with:
+- **Versioning enabled** - Allows recovery of previous state versions
+- **Lifecycle policy** - Keeps the 5 most recent versions AND deletes versions older than 90 days
+- **Uniform bucket-level access** - Enhanced security with IAM-only permissions
+- **IAM bindings** - Grants bucket permissions to project owners, editors, and viewers
+
 ### Team Member Setup
 
+**Note:** Project owners and editors automatically have bucket access. Other team members need individual IAM permissions.
+
 Request these IAM roles from your admin:
-- `roles/storage.objectUser` - Read/write state files
-- `roles/compute.admin` - Manage GKE
+- `roles/storage.objectUser` - Read/write state files (if not project owner/editor)
+- `roles/compute.admin` - Manage GKE clusters
 - `roles/container.admin` - Manage GKE resources
-- `roles/iam.serviceAccountUser` - Use service accounts
-- `roles/pubsub.admin` - Manage Pub/Sub (if enabled)
+- `roles/iam.serviceAccountUser` - Use service accounts for GKE
+- `roles/pubsub.admin` - Manage Pub/Sub resources (if enabled)
 
 ### Using the Backend
 
@@ -135,7 +155,8 @@ Each `.tfvars` file has a paired `.tfbackend` file:
 # Personal dev cluster
 cp envs/gke/dev.tfvars.example envs/gke/dev-<username>.tfvars
 cp envs/gke/dev.tfbackend.example envs/gke/dev-<username>.tfbackend
-# Edit both files to set your username
+# Edit dev-<username>.tfvars to set developer_name
+# Edit dev-<username>.tfbackend to set prefix (bucket is pre-configured)
 terraform init -backend-config=envs/gke/dev-<username>.tfbackend
 
 # Shared cluster (e.g., Prow) - already configured

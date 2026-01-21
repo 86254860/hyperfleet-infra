@@ -129,7 +129,7 @@ cd terraform
 
 This script configures the GCS bucket with:
 - **Versioning enabled** - Allows recovery of previous state versions
-- **Lifecycle policy** - Keeps the 5 most recent versions AND deletes versions older than 90 days
+- **Lifecycle policy** - Keeps the 5 most recent versions OR deletes versions older than 90 days
 - **Uniform bucket-level access** - Enhanced security with IAM-only permissions
 - **IAM bindings** - Grants bucket permissions to project owners, editors, and viewers
 

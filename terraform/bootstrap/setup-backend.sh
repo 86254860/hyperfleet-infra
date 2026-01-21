@@ -157,8 +157,8 @@ success "IAM permissions granted to project owners and editors"
 echo
 
 # Set lifecycle policy to clean up old versions
-# Keeps the 5 most recent versions AND deletes versions older than 90 days
-log "Setting lifecycle policy (keep 5 recent versions, delete versions >90 days old)"
+# Keeps the 5 most recent versions OR deletes versions older than 90 days
+log "Setting lifecycle policy: keep last 5 versions OR delete non-live versions older than 90 days"
 cat > /tmp/lifecycle.json <<EOF
 {
   "lifecycle": {
@@ -169,6 +169,14 @@ cat > /tmp/lifecycle.json <<EOF
         },
         "condition": {
           "numNewerVersions": 5,
+          "isLive": false
+        }
+      },
+      {
+        "action": {
+          "type": "Delete"
+        },
+        "condition": {
           "daysSinceNoncurrentTime": 90,
           "isLive": false
         }

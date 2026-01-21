@@ -63,11 +63,6 @@ output "pubsub_resources" {
   value       = var.use_pubsub ? module.pubsub[0].pubsub_resources : null
 }
 
-output "helm_values_snippet" {
-  description = "Snippet to add to Helm values for Workload Identity and Pub/Sub configuration"
-  value       = var.use_pubsub ? module.pubsub[0].helm_values_snippet : null
-}
-
 # =============================================================================
 # External API Access
 # =============================================================================

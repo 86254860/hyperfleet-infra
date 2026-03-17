@@ -33,10 +33,10 @@ locals {
       for adapter_name, adapter_config in topic_config.subscribers : {
         for role in adapter_config.roles :
         "${topic_name}-${adapter_name}-${replace(role, "roles/pubsub.", "")}" => {
-          topic_name        = topic_name
-          adapter_name      = adapter_name
-          subscription_key  = "${topic_name}-${adapter_name}"
-          role              = role
+          topic_name       = topic_name
+          adapter_name     = adapter_name
+          subscription_key = "${topic_name}-${adapter_name}"
+          role             = role
         }
       }
     ]...)

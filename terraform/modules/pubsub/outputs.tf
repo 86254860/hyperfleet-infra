@@ -76,14 +76,14 @@ output "pubsub_config" {
     # All subscriptions indexed by "{topic}-{adapter}" key
     subscriptions = {
       for key, sub in local.all_subscriptions : key => {
-        subscription_name = google_pubsub_subscription.subscriptions[key].name
-        subscription_id   = google_pubsub_subscription.subscriptions[key].id
-        topic_name        = google_pubsub_topic.topics[sub.topic_name].name
-        dlq_topic_name    = var.enable_dead_letter ? google_pubsub_topic.dead_letter[sub.topic_name].name : null
-        adapter_name      = sub.adapter_name
+        subscription_name   = google_pubsub_subscription.subscriptions[key].name
+        subscription_id     = google_pubsub_subscription.subscriptions[key].id
+        topic_name          = google_pubsub_topic.topics[sub.topic_name].name
+        dlq_topic_name      = var.enable_dead_letter ? google_pubsub_topic.dead_letter[sub.topic_name].name : null
+        adapter_name        = sub.adapter_name
         k8s_service_account = "${sub.adapter_name}-adapter"
-        ack_deadline      = sub.ack_deadline_seconds
-        roles             = sub.roles
+        ack_deadline        = sub.ack_deadline_seconds
+        roles               = sub.roles
       }
     }
   }

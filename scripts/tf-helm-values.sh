@@ -105,6 +105,7 @@ elif [[ "$BROKER_TYPE" == "rabbitmq" ]]; then
   fi
 
   # Redact credentials from URL for logging
+  # shellcheck disable=SC2001
   REDACTED_URL=$(echo "$RABBITMQ_URL" | sed 's|//[^@]*@|//***@|')
 
   echo "Generating RabbitMQ Helm values..."

@@ -28,7 +28,7 @@ hyperfleet-adapter:
       subscription_id: CHANGE_THIS
       # make install will substitute this by data coming from terraform
       topic: CHANGE_THIS
-      deadLetter_topic: ""
+      dead_letter_topic: ""
       create_topic_if_missing: true
       create_subscription_if_missing: true
     rabbitmq:

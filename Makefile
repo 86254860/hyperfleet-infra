@@ -136,7 +136,7 @@ create-maestro-consumer: check-kubectl ## Create a Maestro consumer (requires Ma
 		--namespace $(MAESTRO_NS) \
 		--kubeconfig $(KUBECONFIG) \
 		--image=curlimages/curl:latest -- \
-		curl -s -X POST \
+		curl -sv -X POST \
 		-H "Content-Type: application/json" \
 		http://maestro.$(MAESTRO_NS).svc.cluster.local:8000/api/maestro/v1/consumers \
 		-d '{"name": "$(MAESTRO_CONSUMER)"}'

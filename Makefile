@@ -134,7 +134,7 @@ create-maestro-consumer: check-kubectl ## Create a Maestro consumer (requires Ma
 	@echo "Creating Maestro consumer '$(MAESTRO_CONSUMER)'..."
 	@for i in 1 2 3 4 5; do \
 		kubectl exec deploy/maestro --namespace $(MAESTRO_NS) --kubeconfig $(KUBECONFIG) -- \
-			curl -sf -X POST \
+			curl -sSf -X POST \
 			-H "Content-Type: application/json" \
 			http://maestro.$(MAESTRO_NS).svc.cluster.local:8000/api/maestro/v1/consumers \
 			-d '{"name": "$(MAESTRO_CONSUMER)"}' && exit 0; \

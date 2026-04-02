@@ -228,6 +228,12 @@ make uninstall-rabbitmq
 cd terraform && terraform destroy -var-file=envs/gke/dev.tfvars
 ```
 
+## Documentation
+
+- [Architecture](https://github.com/openshift-hyperfleet/architecture) - System architecture and API documentation
+- [Contributing](CONTRIBUTING.md) - Development setup and contribution guidelines
+- [Changelog](CHANGELOG.md) - Release history and notable changes
+
 ## Related Repositories
 
 - [hyperfleet-api](https://github.com/openshift-hyperfleet/hyperfleet-api) - HyperFleet API server
